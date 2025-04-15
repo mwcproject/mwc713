@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
 use mwc_core::core::hash::Hash;
@@ -106,7 +106,7 @@ where
     K: Keychain + 'a,
 {
     wallet_lock!(wallet_inst, w);
-    let id = keys::next_available_key(&mut **w, None, None)?;
+    let id = keys::next_available_key(&mut **w, None)?;
     let keychain = w.keychain(None)?;
     let sec_key = keychain.derive_key(amount, &id, SwitchCommitmentType::Regular)?;
     let pubkey = PublicKey::from_secret_key(keychain.secp(), &sec_key)?;
@@ -215,6 +215,7 @@ where
         false,
         None,
         None,
+        None,
     )?;
     let mut ret = 1000000000;
     for t in &tx {
@@ -292,6 +293,7 @@ where
             false,
             None,
             None,
+            None,
         )?,
     ));
 
@@ -330,6 +332,7 @@ where
         false,
         pagination_start,
         pagination_length,
+        None,
     )?;
 
     let txs = txs
@@ -539,7 +542,11 @@ where
             && tx.tx_type != TxLogEntryType::TxReceivedCancelled
         {
             if let Some(uuid_str) = tx.tx_slate_id {
-                if let Ok(transaction) = w.get_stored_tx_by_uuid(&uuid_str.to_string()) {
+                let mut tx_data = w.get_stored_tx_by_uuid(&uuid_str.to_string(), false);
+                if tx_data.is_err() {
+                    tx_data = w.get_stored_tx_by_uuid(&uuid_str.to_string(), true)
+                }
+                if let Ok(transaction) = tx_data {
                     tx_info.tx_kernels = transaction
                         .body
                         .kernels
@@ -783,7 +790,7 @@ pub fn init_send_tx<'a, L, C, K>(
     num_change_outputs: u32,
     selection_strategy_is_use_all: bool,
     message: Option<String>,
-    outputs: Option<Vec<String>>, // outputs to include into the transaction
+    outputs: Option<HashSet<String>>, // outputs to include into the transaction
     version: Option<u16>,         // Slate version
     routputs: usize,              // Number of resulting outputs. Normally it is 1
     status_send_channel: &Option<Sender<StatusMessage>>,
@@ -799,14 +806,15 @@ where
     C: NodeClient + 'a,
     K: Keychain + 'a,
 {
+    wallet_lock!(wallet_inst, w);
+
     // Caller is responsible for refresh call
     mwc_wallet_libwallet::owner::update_wallet_state(
-        wallet_inst.clone(),
+        &mut **w,
         None,
         status_send_channel,
     )?;
 
-    wallet_lock!(wallet_inst, w);
 
     let ttl_blocks = if ttl_blocks == 0 {
         None
@@ -977,7 +985,13 @@ where
     K: Keychain + 'a,
 {
     wallet_lock!(wallet_inst, w);
-    Ok(w.get_stored_tx_by_uuid(uuid)?)
+
+    let mut res = w.get_stored_tx_by_uuid(uuid, false);
+    if res.is_err() {
+        res = w.get_stored_tx_by_uuid(uuid, true);
+    }
+
+    res.map_err(|e| e.into())
 }
 
 pub fn node_info<'a, L, C, K>(
@@ -1163,8 +1177,11 @@ where
         status_send_channel = Some(tx);
     }
 
-    let res =
-        mwc_wallet_libwallet::owner::update_wallet_state(wallet_inst, None, &status_send_channel)?;
+
+    let res = {
+        wallet_lock!(wallet_inst, w);
+        mwc_wallet_libwallet::owner::update_wallet_state(&mut **w, None, &status_send_channel)?
+    };
 
     running.store(false, Ordering::Relaxed);
     if updater.is_some() {
@@ -1233,6 +1250,7 @@ where
         None,
         Some(&parent_key_id),
         false,
+        None,
         None,
         None,
     )?;

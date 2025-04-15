@@ -114,6 +114,7 @@ use mwc_wallet_controller::command;
 use mwc_wallet_libwallet::proof::proofaddress;
 use mwc_wallet_libwallet::proof::tx_proof;
 use std::borrow::Borrow;
+use std::collections::HashSet;
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
@@ -1742,7 +1743,7 @@ fn do_command(
 
             let outputs_arg = args.value_of("outputs");
 
-            let output_list: Option<Vec<String>> = if outputs_arg.is_none() {
+            let output_list: Option<HashSet<String>> = if outputs_arg.is_none() {
                 if strategy == "custom" {
                     return Err(Error::CustomWithNoOutputs);
                 }
@@ -1751,7 +1752,7 @@ fn do_command(
                 if strategy != "custom" {
                     return Err(Error::NonCustomWithOutputs);
                 }
-                let ret: Vec<String> = outputs_arg
+                let ret: HashSet<String> = outputs_arg
                     .unwrap()
                     .split(",")
                     .map(|s| s.to_string())

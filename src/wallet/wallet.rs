@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use common::config::Wallet713Config;
 use common::Error;
 use uuid::Uuid;
@@ -418,7 +419,7 @@ impl Wallet {
         &self,
         refresh_from_node: bool,
         minimum_confirmations: u64,
-        output_list: &Option<Vec<String>>,
+        output_list: &Option<HashSet<String>>,
     ) -> Result<u64, Error> {
         let mut value = 0;
         let w = self.get_wallet_instance()?;
@@ -427,12 +428,11 @@ impl Wallet {
         let (_validated, outputs) =
             api::retrieve_outputs(w.clone(), false, refresh_from_node, None, None, None)?;
 
-        if output_list.is_some() {
-            let ol = output_list.clone().unwrap();
+        if let Some(output_list) = output_list {
             for o in outputs {
                 if o.output.eligible_to_spend(height, minimum_confirmations) {
                     let commit_str = o.output.commit.clone().unwrap();
-                    if ol.iter().any(|e| *e == commit_str) {
+                    if output_list.contains(&commit_str) {
                         value += o.output.value;
                     }
                 }
@@ -464,7 +464,7 @@ impl Wallet {
         &self,
         refresh_from_node: bool,
         minimum_confirmations: u64,
-        output_list: &Option<Vec<String>>,
+        output_list: &Option<HashSet<String>>,
     ) -> Result<usize, Error> {
         let wallet = self.get_wallet_instance()?;
 
@@ -474,12 +474,11 @@ impl Wallet {
         let (_validated, outputs) =
             api::retrieve_outputs(wallet.clone(), false, refresh_from_node, None, None, None)?;
 
-        if output_list.is_some() {
-            let ol = output_list.clone().unwrap();
+        if let Some(output_list) = output_list {
             for o in outputs {
                 if o.output.eligible_to_spend(height, minimum_confirmations) {
                     let commit_str = o.output.commit.clone().unwrap();
-                    if ol.iter().any(|e| *e == commit_str) {
+                    if output_list.contains(&commit_str) {
                         count = count + 1;
                     }
                 }
@@ -540,7 +539,7 @@ impl Wallet {
         change_outputs: u32,
         max_outputs: u32,
         message: Option<String>,
-        outputs: Option<Vec<String>>,
+        outputs: Option<HashSet<String>>,
         version: Option<u16>,
         routputs: usize,
         status_send_channel: &Option<Sender<StatusMessage>>,
