@@ -16,7 +16,6 @@ extern crate colored;
 extern crate blake2_rfc;
 extern crate commands;
 extern crate enquote;
-extern crate parking_lot;
 extern crate path_clean;
 #[cfg(not(target_os = "android"))]
 extern crate rpassword;
@@ -300,6 +299,7 @@ fn start_tor_listener(
     config: &Wallet713Config,
     wallet: Arc<Mutex<Wallet>>,
     tor_running: &mut bool,
+    #[cfg(feature = "libp2p")]
     start_libp2p: bool,
     tor_bridge_line: Option<String>,
     tor_client_option: Option<String>,
@@ -384,6 +384,7 @@ fn start_tor_listener(
     let tor_secret = resp.unwrap();
     *tor_running = tor_secret.iter().filter(|b| **b != 0).count() > 0;
 
+    #[cfg(feature = "libp2p")]
     if start_libp2p && *tor_running {
         if config.libp2p_port.is_none() {
             return Err(Error::ArgumentError("Please define libp2p_port value in config".to_string()));
@@ -1216,6 +1217,7 @@ fn do_command(
                             &config,
                             wallet.clone(),
                             tor_running,
+                            #[cfg(feature = "libp2p")]
                             libp2p,
                             bridge_line,
                             client_option,
@@ -2735,6 +2737,7 @@ fn do_command(
             cli_message!("Sender: {}", sender.unwrap_or("None".to_string()));
             cli_message!("Recipient: {}", recipient.unwrap_or("None".to_string()));
         }
+        #[cfg(feature = "libp2p")]
         Some("integrity") => {
             let args = matches.subcommand_matches("integrity").unwrap();
 
@@ -2781,6 +2784,7 @@ fn do_command(
                 },
             )?;
         }
+        #[cfg(feature = "libp2p")]
         Some("messaging") => {
             let args = matches.subcommand_matches("messaging").unwrap();
 
@@ -2825,6 +2829,7 @@ fn do_command(
                 },
             )?;
         }
+        #[cfg(feature = "libp2p")]
         Some("send_marketplace_message") => {
             let args = matches
                 .subcommand_matches("send_marketplace_message")

@@ -4,7 +4,7 @@ pub mod config;
 mod error;
 
 pub use self::error::Error;
-pub use parking_lot::Mutex;
+pub use mwc_util::Mutex;
 pub use std::sync::Arc;
 
 pub const COLORED_PROMPT: &'static str = "\x1b[36mwallet713>\x1b[0m ";

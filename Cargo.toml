@@ -1,6 +1,6 @@
 [package]
 name = "mwc713"
-version = "5.3.4"
+version = "5.3.5"
 authors = ["vault713 devs"]
 description = "A wallet that makes it easy to send, store, and swap MWC."
 keywords = [ "mwc", "mwcproject", "rust", "crypto", "cryptocurrency" ]
@@ -27,26 +27,26 @@ uuid = { version = "0.8", features = ["serde", "v4"] }
 blake2-rfc = "0.2"
 log = "0.4"
 url = "2.1"
-parking_lot = {version = "0.10"}
+#parking_lot = {version = "0.12"}
 commands = "0.0.5"
 enquote = "1.0"
-zip = { version = "0.5", features = ["deflate"] }
-ed25519-dalek = "1.0.0-pre.4"
+zip = { version = "0.5.11", features = ["deflate"] }
+ed25519-dalek = "1"
 thiserror = "1"
 
 # Release
-mwc_core = { git = "https://github.com/mwcproject/mwc-node", version="5.3.8", tag = "5.3.8.1" }
-mwc_keychain = { git = "https://github.com/mwcproject/mwc-node", version="5.3.8", tag = "5.3.8.1" }
-mwc_util = { git = "https://github.com/mwcproject/mwc-node", version="5.3.8", tag = "5.3.8.1" }
-mwc_api = { git = "https://github.com/mwcproject/mwc-node", version="5.3.8", tag = "5.3.8.1" }
-mwc_store = { git = "https://github.com/mwcproject/mwc-node", version="5.3.8", tag = "5.3.8.1" }
-mwc_p2p = { git = "https://github.com/mwcproject/mwc-node", version="5.3.8", tag = "5.3.8.1" }
-mwc_wallet_impls = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.5", tag = "5.3.5" }
-mwc_wallet_libwallet = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.5", tag = "5.3.5" }
-mwc_wallet_api = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.5", tag = "5.3.5" }
-mwc_wallet_controller = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.5", tag = "5.3.5" }
-mwc_wallet_config = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.5", tag = "5.3.5" }
-mwc_wallet_util = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.5", tag = "5.3.5" }
+mwc_core = { git = "https://github.com/mwcproject/mwc-node", version="5.3.9", tag = "5.3.9" }
+mwc_keychain = { git = "https://github.com/mwcproject/mwc-node", version="5.3.9", tag = "5.3.9" }
+mwc_util = { git = "https://github.com/mwcproject/mwc-node", version="5.3.9", tag = "5.3.9" }
+mwc_api = { git = "https://github.com/mwcproject/mwc-node", version="5.3.9", tag = "5.3.9" }
+mwc_store = { git = "https://github.com/mwcproject/mwc-node", version="5.3.9", tag = "5.3.9" }
+mwc_p2p = { git = "https://github.com/mwcproject/mwc-node", version="5.3.9", tag = "5.3.9" }
+mwc_wallet_impls = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.8", tag = "5.3.8" }
+mwc_wallet_libwallet = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.8", tag = "5.3.8" }
+mwc_wallet_api = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.8", tag = "5.3.8" }
+mwc_wallet_controller = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.8", tag = "5.3.8" }
+mwc_wallet_config = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.8", tag = "5.3.8" }
+mwc_wallet_util = { git = "https://github.com/mwcproject/mwc-wallet", version="5.3.8", tag = "5.3.8" }
 
 # For bleeding edge
 #mwc_core = { git = "https://github.com/mwcproject/mwc-node", branch = "5.3.100" }
@@ -84,3 +84,6 @@ dirs = "2.0"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 ansi_term = "0.11"
+
+[features]
+libp2p = ["mwc_wallet_impls/libp2p", "mwc_wallet_libwallet/libp2p", "mwc_wallet_controller/libp2p"]

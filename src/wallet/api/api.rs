@@ -7,7 +7,7 @@ use mwc_p2p::types::PeerInfoDisplay;
 pub use mwc_util::secp::Message;
 use mwc_util::secp::{ContextFlag, Secp256k1, Signature};
 
-use crate::common::{Arc, Error, Mutex};
+use crate::common::{Arc, Error};
 use mwc_core::core::Transaction;
 use mwc_keychain::Identifier;
 use mwc_util::secp::key::{PublicKey, SecretKey};
@@ -30,6 +30,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
+use mwc_util::Mutex;
 
 // struct for sending back node information
 pub struct NodeInfo {

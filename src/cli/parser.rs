@@ -23,7 +23,7 @@ impl<'a, 'b> Parser {
     }
 
     fn parser() -> App<'a, 'b> {
-        App::new("")
+        let mut app = App::new("")
             .setting(AppSettings::NoBinaryName)
             .subcommand(
                 SubCommand::with_name("exit")
@@ -697,8 +697,10 @@ impl<'a, 'b> Parser {
                     .arg(
                         Arg::from_usage("[file] -f, --file=<file> 'File with a slate or slatepack content'")
                     )
-            )
-            .subcommand(
+            );
+
+        if cfg!(feature = "libp2p") {
+            app = app.subcommand(
                 SubCommand::with_name("integrity")
                     .about("Manage integrity fees and funds")
                     .arg(
@@ -720,63 +722,65 @@ impl<'a, 'b> Parser {
                         Arg::from_usage("[json] -j, --json 'Print response in Json format'")
                     )
             )
-            .subcommand(
-                SubCommand::with_name("messaging")
-                    .about("Manage libp2p messaging routine")
-                    .arg(
-                        Arg::from_usage("[status] -s, --status 'Show status of messaging: listening topics, minimal fee, broadcasting messages, number of received messages.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[add_topic] -a, --add_topic=<topic> 'Add topic to listen. Messages must be in json format.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[fee] -f, --fee=<mwc> 'Integrity fee. For topic and receive_message it is a minimal accepted fee. For publishing it is integrity fee to pay.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[fee_uuid] -u, --fee_uuid=<uuid> 'Integrity transaction fee to use.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[remove_topic] -r, --remove_topic=<topic> 'Stop listening on the topic.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[publish_message] -p, --publish_message=<message> 'Start broadcasting the message.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[publish_topic] -t, --publish_topic=<topic> 'Topic for the broadcast message.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[publish_interval] -i, --publish_interval=<sec> 'Time interval for broadcasting (seconds). The minimal interval is 1 minute.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[withdraw_message] -w, --withdraw_message=<uuid> 'Stop broadcast message.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[receive_messages] -v, --receive_messages=<yes|no> 'Print messages that was received. Optionally messages can be deleted from the buffer. Note, last 1000 messages will be stored.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[check_integrity] --check_integrity 'Check Integrity context expiration of broadcast messages. Need to be done at least every hour.'")
-                    )
-                    .arg(
-                        Arg::from_usage("[check_integrity_retain] --check_integrity_retain 'Delete messages with expired Integrity context'")
-                    )
-                    .arg(
-                        Arg::from_usage("[json] --json 'Print response in Json format'")
-                    )
-            )
-            .subcommand(
-                SubCommand::with_name("send_marketplace_message")
-                    .about("Send marketplace related message to another wallet by tor address")
-                    .arg(
-                        Arg::from_usage("-c, --command=<command> 'Command to perform. Current supported values are check_offer, accept_offer and fail_bidding'")
-                    )
-                    .arg(
-                        Arg::from_usage("-o, --offer_id=<offer_id> 'Marketplace offer ID'")
-                    )
-                    .arg(
-                        Arg::from_usage("-a, --tor_address=<tor_address> 'Another wallet tor address'")
-                    )
-            )
-            .subcommand(
+                .subcommand(
+                    SubCommand::with_name("messaging")
+                        .about("Manage libp2p messaging routine")
+                        .arg(
+                            Arg::from_usage("[status] -s, --status 'Show status of messaging: listening topics, minimal fee, broadcasting messages, number of received messages.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[add_topic] -a, --add_topic=<topic> 'Add topic to listen. Messages must be in json format.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[fee] -f, --fee=<mwc> 'Integrity fee. For topic and receive_message it is a minimal accepted fee. For publishing it is integrity fee to pay.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[fee_uuid] -u, --fee_uuid=<uuid> 'Integrity transaction fee to use.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[remove_topic] -r, --remove_topic=<topic> 'Stop listening on the topic.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[publish_message] -p, --publish_message=<message> 'Start broadcasting the message.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[publish_topic] -t, --publish_topic=<topic> 'Topic for the broadcast message.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[publish_interval] -i, --publish_interval=<sec> 'Time interval for broadcasting (seconds). The minimal interval is 1 minute.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[withdraw_message] -w, --withdraw_message=<uuid> 'Stop broadcast message.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[receive_messages] -v, --receive_messages=<yes|no> 'Print messages that was received. Optionally messages can be deleted from the buffer. Note, last 1000 messages will be stored.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[check_integrity] --check_integrity 'Check Integrity context expiration of broadcast messages. Need to be done at least every hour.'")
+                        )
+                        .arg(
+                            Arg::from_usage("[check_integrity_retain] --check_integrity_retain 'Delete messages with expired Integrity context'")
+                        )
+                        .arg(
+                            Arg::from_usage("[json] --json 'Print response in Json format'")
+                        )
+                )
+                .subcommand(
+                    SubCommand::with_name("send_marketplace_message")
+                        .about("Send marketplace related message to another wallet by tor address")
+                        .arg(
+                            Arg::from_usage("-c, --command=<command> 'Command to perform. Current supported values are check_offer, accept_offer and fail_bidding'")
+                        )
+                        .arg(
+                            Arg::from_usage("-o, --offer_id=<offer_id> 'Marketplace offer ID'")
+                        )
+                        .arg(
+                            Arg::from_usage("-a, --tor_address=<tor_address> 'Another wallet tor address'")
+                        )
+                );
+        }
+
+        app = app.subcommand(
                 SubCommand::with_name("eth_info")
                     .about("displays ethereum wallet info")
                     .arg(
@@ -836,6 +840,7 @@ impl<'a, 'b> Parser {
                     .arg(
                         Arg::from_usage("-p, --proof=<proof> 'Proof record, generated by generate_ownership_proof'")
                     )
-            )
+            );
+        app
     }
 }
