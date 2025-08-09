@@ -393,6 +393,7 @@ impl Wallet {
             // should only be one here, but just in case
             for tx in txs {
                 display::tx_messages(&tx, true, &secp)?;
+                #[cfg(feature = "grin_proof")]
                 display::payment_proof(&tx)?;
             }
         }
