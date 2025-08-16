@@ -974,9 +974,11 @@ impl Wallet {
         let wallet_inst = lc.wallet_inst()?;
         wallet_inst.set_parent_key_id_by_name(account)?;
 
+        let swap_electrumx_addr = config.swap_electrumx_addr.as_ref().map(|s| s.data().clone());
+
         mwc_wallet_libwallet::swap::trades::init_swap_trade_backend(
             wallet_inst.get_data_file_dir(),
-            &config.swap_electrumx_addr,
+            &swap_electrumx_addr,
             &config.swap_eth_contract_addr,
             &config.swap_erc20_contract_addr,
             &config.swap_eth_infura_project_id,

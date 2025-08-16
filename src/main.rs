@@ -1639,6 +1639,7 @@ fn do_command(
                 cli_message!("{}.response created successfully.", source_name);
             } else {
                 cli_message!("Slatepack: {}", slate_str);
+                cli_message!("TxId: {}", slate.id);
             }
         }
         Some("showpubkeys") => {
@@ -2120,6 +2121,7 @@ fn do_command(
                 w.tx_lock_outputs(&slate, address, 0)?;
 
                 cli_message!("Slatepack: {}", slate_str);
+                cli_message!("TxId: {}", slate.id);
 
                 // Stopping updater, sync should be done by now
                 running.store(false, Ordering::Relaxed);

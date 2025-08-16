@@ -20,6 +20,28 @@ use std::collections::BTreeMap;
 const WALLET713_HOME: &str = ".mwc713";
 const WALLET713_DEFAULT_CONFIG_FILENAME: &str = "wallet713.toml";
 
+/// New-type because of toml serialization issues
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct SwapElectrumAddrs(
+    pub BTreeMap<String, String>,
+);
+
+impl SwapElectrumAddrs {
+    pub fn data(&self) -> &BTreeMap<String, String> {
+        &self.0
+    }
+    pub fn mut_data(&mut self) -> &mut BTreeMap<String, String> {
+        &mut self.0
+    }
+}
+
+impl From<BTreeMap<String, String>> for SwapElectrumAddrs {
+    fn from(m: BTreeMap<String, String>) -> Self {
+        Self(m)
+    }
+}
+
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct Wallet713Config {
     pub chain: ChainTypes,
@@ -66,13 +88,14 @@ pub struct Wallet713Config {
     /// ethereum swap infura project id
     pub swap_eth_infura_project_id: Option<String>,
 
+    // Log filename for tor
+    pub tor_log_file: Option<String>,
+
     /// Electrum nodes for secondary coins
     /// Key: <coin>_[main|test]_[1|2]
     /// Value: url
-    pub swap_electrumx_addr: Option<BTreeMap<String, String>>,
-
-    // Log filename for tor
-    pub tor_log_file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub swap_electrumx_addr: Option<SwapElectrumAddrs>,
 }
 
 pub const WALLET713_CONFIG_HELP: &str =
@@ -261,7 +284,7 @@ impl Wallet713Config {
         "7f1274674be54d2881bf3c0168bf9855".to_string()
     }
 
-    fn get_default_electrumx_servers() -> BTreeMap<String, String> {
+    fn get_default_electrumx_servers() -> SwapElectrumAddrs {
         [
             ("btc_main_1", "btc.main1.swap.mwc.mw:18337"),
             ("btc_main_2", "btc.main2.swap.mwc.mw:18337"),
@@ -292,6 +315,7 @@ impl Wallet713Config {
         .cloned()
         .map(|i| (i.0.to_string(), i.1.to_string()))
         .collect::<BTreeMap<String, String>>()
+        .into()
     }
 
     #[cfg(not(target_os = "android"))]
@@ -331,9 +355,9 @@ impl Wallet713Config {
             config.swap_electrumx_addr = Some(default_elecetumx_servers);
         } else {
             let mut settings = config.swap_electrumx_addr.unwrap();
-            for (k, v) in default_elecetumx_servers {
-                if !settings.contains_key(&k) {
-                    settings.insert(k, v);
+            for (k, v) in default_elecetumx_servers.0 {
+                if !settings.mut_data().contains_key(&k) {
+                    settings.mut_data().insert(k, v);
                 }
             }
             config.swap_electrumx_addr = Some(settings);
