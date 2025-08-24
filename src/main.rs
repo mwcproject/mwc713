@@ -1131,7 +1131,9 @@ fn do_command(
             {
                 let mut wallet_inst = wallet.lock();
                 wallet_inst.complete(seed, config, "default", passphrase, true, seed_length)?;
-                wallet_inst.update_tip_as_last_scanned()?;
+                // Can fail for MWC node setup. Nocal node still not started.
+                // This error is not critical, rescan will be made, will need to wait after.
+                let _ = wallet_inst.update_tip_as_last_scanned();
             }
             show_address(config, wallet, false)?;
 
