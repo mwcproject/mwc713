@@ -7,7 +7,7 @@ use enquote::unquote;
 pub struct Parser {}
 
 impl<'a, 'b> Parser {
-    pub fn parse(command: &str) -> Result<ArgMatches, Error> {
+    pub fn parse(command: &str) -> Result<ArgMatches<'_>, Error> {
         let command = command.trim();
         let mut tokens = tokenize(command)
             .map_err(|e| Error::TokenizerError(format!("Unable to parse command: {}, {}", command, e)))?;

@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet, VecDeque};
 use uuid::Uuid;
 
@@ -31,6 +32,7 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread::JoinHandle;
 use mwc_util::Mutex;
+use mwc_wallet_libwallet::types::TxSession;
 
 // struct for sending back node information
 pub struct NodeInfo {
@@ -783,6 +785,7 @@ where
 
 pub fn init_send_tx<'a, L, C, K>(
     wallet_inst: Arc<Mutex<Box<dyn WalletInst<'a, L, C, K>>>>,
+    tx_session: &Option<RefCell<TxSession>>,
     active_account: Option<String>,
     address: Option<String>,
     amount: u64,
@@ -903,13 +906,14 @@ where
         amount_includes_fee: Some(amount_includes_fee),
     };
 
-    let s = mwc_wallet_libwallet::owner::init_send_tx(&mut **w, None, &params, false, routputs)?;
+    let s = mwc_wallet_libwallet::owner::init_send_tx(&mut **w, None, &tx_session, &params, false, routputs)?;
     Ok(s)
 }
 
 // Lock put outputs and tx into the DB. Caller suppose to call it if slate was created and send sucessfully.
 pub fn tx_lock_outputs<'a, L, C, K>(
     wallet_inst: Arc<Mutex<Box<dyn WalletInst<'a, L, C, K>>>>,
+    tx_session: &Option<RefCell<TxSession>>,
     slate: &Slate,
     address: Option<String>,
     participant_id: usize,
@@ -923,6 +927,7 @@ where
     mwc_wallet_libwallet::owner::tx_lock_outputs(
         &mut **w,
         None,
+        tx_session,
         slate,
         address,
         participant_id,
@@ -933,7 +938,9 @@ where
 
 pub fn finalize_tx<'a, L, C, K>(
     wallet_inst: Arc<Mutex<Box<dyn WalletInst<'a, L, C, K>>>>,
+    tx_session: &Option<RefCell<TxSession>>,
     slate: &mut Slate,
+    do_proof: bool,
 ) -> Result<(), Error>
 where
     L: WalletLCProvider<'a, C, K>,
@@ -943,7 +950,7 @@ where
     wallet_lock!(wallet_inst, w);
 
     let (slate_res, _context) =
-        mwc_wallet_libwallet::owner::finalize_tx(&mut **w, None, slate, true, false)?;
+        mwc_wallet_libwallet::owner::finalize_tx(&mut **w, None, tx_session, slate, true, false, do_proof)?;
     *slate = slate_res;
 
     Ok(())
@@ -1397,6 +1404,7 @@ where
 
 pub fn initiate_receive_tx<'a, L, C, K>(
     wallet_inst: Arc<Mutex<Box<dyn WalletInst<'a, L, C, K>>>>,
+    tx_session: &Option<RefCell<TxSession>>,
     address: Option<String>,
     active_account: Option<String>,
     amount: u64,
@@ -1426,6 +1434,7 @@ where
     let s = mwc_wallet_libwallet::owner::issue_invoice_tx(
         &mut **w,
         None,
+        tx_session,
         &params,
         false,
         num_outputs,
@@ -1435,6 +1444,7 @@ where
 
 pub fn receive_tx<'a, L, C, K>(
     wallet_inst: Arc<Mutex<Box<dyn WalletInst<'a, L, C, K>>>>,
+    tx_session: &Option<RefCell<TxSession>>,
     address: Option<String>,
     slate: &mut Slate,
     message: Option<String>,
@@ -1454,6 +1464,7 @@ where
     let s = mwc_wallet_libwallet::foreign::receive_tx(
         &mut **w,
         None,
+        tx_session,
         slate,
         address,
         key_id,
@@ -1588,8 +1599,7 @@ where
     let secp = Secp256k1::with_caps(ContextFlag::VerifyOnly);
 
     let secret = proofaddress::payment_proof_address_dalek_secret(&keychain, None)?;
-    let height = w.w2n_client().get_chain_tip()?.0;
-    let slate_data = PathToSlateGetter::build_form_str(slate_str.to_string()).get_tx(Some(&secret), height, &secp)?;
+    let slate_data = PathToSlateGetter::build_form_str(slate_str.to_string()).get_tx(Some(&secret), &secp)?;
 
     match slate_data {
         SlateGetData::PlainSlate(slate) => Ok((slate, None, None, None)),

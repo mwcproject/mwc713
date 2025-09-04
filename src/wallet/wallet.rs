@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::collections::HashSet;
 use common::config::Wallet713Config;
 use common::Error;
@@ -29,6 +30,7 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use mwc_util::secp::{ContextFlag, Secp256k1};
+use mwc_wallet_libwallet::types::TxSession;
 
 pub struct Wallet {
     backend: Option<
@@ -270,7 +272,7 @@ impl Wallet {
         Ok(())
     }
 
-    pub fn get_height(&self) -> Result<u64, Error> {
+    pub fn _get_height(&self) -> Result<u64, Error> {
         let wallet_inst = self.get_wallet_instance()?;
         match api::node_height(wallet_inst.clone()) {
             Ok((h, _)) => return Ok(h),
@@ -533,6 +535,7 @@ impl Wallet {
     // Create slate but not lock outptus into the DB. Call tx_lock_outputs to do that
     pub fn init_send_tx(
         &self,
+        tx_session: &Option<RefCell<TxSession>>,
         address: Option<String>,
         amount: u64,
         minimum_confirmations: u64,
@@ -553,6 +556,7 @@ impl Wallet {
     ) -> Result<Slate, Error> {
         let slate = api::init_send_tx(
             self.get_wallet_instance()?,
+            tx_session,
             None,
             address.clone(),
             amount,
@@ -579,6 +583,7 @@ impl Wallet {
     // Create invoice transaction
     pub fn initiate_receive_tx(
         &self,
+        tx_session: &Option<RefCell<TxSession>>,
         address: Option<String>,
         amount: u64,
         num_outputs: usize,
@@ -586,6 +591,7 @@ impl Wallet {
     ) -> Result<Slate, Error> {
         let slate = api::initiate_receive_tx(
             self.get_wallet_instance()?,
+            tx_session,
             address,
             None,
             amount,
@@ -663,6 +669,7 @@ impl Wallet {
 
     pub fn process_sender_initiated_slate(
         &self,
+        tx_session: &Option<RefCell<TxSession>>,
         address: Option<String>,
         slate: &mut Slate,
         message: Option<String>,
@@ -672,6 +679,7 @@ impl Wallet {
     ) -> Result<(), Error> {
         let s = api::receive_tx(
             self.get_wallet_instance()?,
+            tx_session,
             address,
             slate,
             message,
@@ -687,11 +695,12 @@ impl Wallet {
     // Lock slate outputs. In other words create output and transaction record at the DB.
     pub fn tx_lock_outputs(
         &self,
+        tx_session: &Option<RefCell<TxSession>>,
         slate: &Slate,
         address: Option<String>,
         participant_id: usize,
     ) -> Result<(), Error> {
-        api::tx_lock_outputs(self.get_wallet_instance()?, slate, address, participant_id)?;
+        api::tx_lock_outputs(self.get_wallet_instance()?, tx_session, slate, address, participant_id)?;
         Ok(())
     }
 
@@ -701,11 +710,17 @@ impl Wallet {
         Ok(())
     }
 
-    pub fn finalize_post_slate(&self, slate: &mut Slate, fluff: bool) -> Result<(), Error> {
+    pub fn finalize_post_slate(
+        &self,
+        tx_session: &Option<RefCell<TxSession>>,
+        slate: &mut Slate,
+        fluff: bool,
+        do_proof: bool
+    ) -> Result<(), Error> {
         let wallet = self.get_wallet_instance()?;
         api::verify_slate_messages(&slate)
             .map_err(|e| Error::MwcWalletVerifySlateMessagesError(format!("{}", e)))?;
-        api::finalize_tx(wallet.clone(), slate)
+        api::finalize_tx(wallet.clone(), tx_session, slate, do_proof)
             .map_err(|e| Error::MwcWalletFinalizeError(format!("{}", e)))?;
         if slate.tx.is_none() {
             return Err(Error::ArgumentError("Submitted slate is empty".to_string()));

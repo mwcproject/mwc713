@@ -113,6 +113,7 @@ use mwc_wallet_controller::command;
 use mwc_wallet_libwallet::proof::proofaddress;
 use mwc_wallet_libwallet::proof::tx_proof;
 use std::borrow::Borrow;
+use std::cell::RefCell;
 use std::collections::HashSet;
 use std::fs;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -121,6 +122,7 @@ use mwc_core::ser::DeserializationMode;
 use mwc_util::secp::{ContextFlag, Secp256k1};
 use mwc_wallet_api::Owner;
 use mwc_wallet_config::types::{TorBridgeConfig, TorProxyConfig};
+use mwc_wallet_libwallet::types::TxSession;
 use rustyline::validate::Validator;
 use uuid::Uuid;
 
@@ -1608,7 +1610,9 @@ fn do_command(
             };
 
             // Processing with a new receive account
+            let tx_session = Some(RefCell::new(TxSession::new()));
             w.process_sender_initiated_slate(
+                &tx_session,
                 Some(address),
                 &mut slate,
                 message.map(|s| s.to_string()),
@@ -1643,6 +1647,9 @@ fn do_command(
                 cli_message!("Slatepack: {}", slate_str);
                 cli_message!("TxId: {}", slate.id);
             }
+
+            wallet_lock!(w.get_wallet_instance()?, w);
+            tx_session.unwrap().borrow_mut().save_tx_data(&mut **w,None, &slate.id )?;
         }
         Some("showpubkeys") => {
             let args = matches.subcommand_matches("showpubkeys").unwrap();
@@ -1697,7 +1704,7 @@ fn do_command(
             if slate.participant_data.len() < 2 && !slate.compact_slate {
                 cli_message!("Error: Not a valid response slate!");
             } else {
-                wallet.lock().finalize_post_slate(&mut slate, fluff)?;
+                wallet.lock().finalize_post_slate(&None, &mut slate, fluff, true)?;
                 cli_message!("{} finalized transaction {}", source_name, slate.id);
             }
         }
@@ -1864,7 +1871,10 @@ fn do_command(
                     address = Some(String::from("file_proof"));
                 }
 
+                let tx_session = Some(RefCell::new(TxSession::new()));
+
                 let slate = w.init_send_tx(
+                    &tx_session,
                     address.clone(),
                     amount,
                     confirmations,
@@ -1912,7 +1922,7 @@ fn do_command(
                 fs::copy(&temp_file_name, input)?;
                 fs::remove_file(temp_file_name)?;
 
-                w.tx_lock_outputs(&slate, address, 0)?;
+                w.tx_lock_outputs(&tx_session, &slate, address, 0)?;
 
                 cli_message!("{} created successfully.", input);
 
@@ -1920,11 +1930,18 @@ fn do_command(
                 running.store(false, Ordering::Relaxed);
                 let _ = updater.join();
 
+                wallet_lock!(w.get_wallet_instance()?, w);
+                tx_session.unwrap().borrow_mut().save_tx_data(&mut **w,None, &slate.id )?;
+
                 return Ok(());
             }
             else if self_send {
+                let tx_session1 = Some(RefCell::new(TxSession::new()));
+                let tx_session2 = Some(RefCell::new(TxSession::new()));
+
                 let w = wallet.lock();
                 let mut slate = w.init_send_tx(
+                    &tx_session1,
                     None,
                     amount,
                     confirmations,
@@ -1944,9 +1961,10 @@ fn do_command(
                     amount_includes_fee,
                 )?;
 
-                w.tx_lock_outputs(&slate, Some(String::from("self")), 0)?;
+                w.tx_lock_outputs(&tx_session1, &slate, Some(String::from("self")), 0)?;
 
                 w.process_sender_initiated_slate(
+                    &tx_session2,
                     None,
                     &mut slate,
                     Some(String::from("self")),
@@ -1955,7 +1973,14 @@ fn do_command(
                     to,
                 )?;
 
-                w.finalize_post_slate(&mut slate, fluff)?;
+                w.finalize_post_slate(&tx_session1, &mut slate, fluff, do_proof)?;
+
+                debug_assert!( tx_session1.as_ref().unwrap().borrow().get_context_participant().is_none() );
+                debug_assert!( tx_session2.as_ref().unwrap().borrow().get_context_participant().is_none() );
+
+                wallet_lock!(w.get_wallet_instance()?, w);
+                tx_session1.unwrap().borrow_mut().save_tx_data(&mut **w,None, &slate.id )?;
+                tx_session2.unwrap().borrow_mut().save_tx_data(&mut **w,None, &slate.id )?;
 
                 return Ok(());
             } else if let Some(to) = to {
@@ -2000,9 +2025,12 @@ fn do_command(
                     }
                 }
 
+                let tx_session = Some(RefCell::new(TxSession::new()));
+
                 let w = wallet.lock();
                 let address = Some(to.to_string());
                 let mut slate = w.init_send_tx(
+                    &tx_session,
                     address.clone(),
                     amount,
                     confirmations,
@@ -2029,7 +2057,6 @@ fn do_command(
                 let original_slate = slate.clone();
                 let (dalek_secret, _dalek_pk) = w.get_slatepack_keys()?;
 
-                let height = w.get_height()?;
                 let secp = Secp256k1::new();
 
                 slate = sender.send_tx(
@@ -2039,7 +2066,6 @@ fn do_command(
                     &dalek_secret,
                     slatepack_recipient_dalek_pk,
                     other_wallet_version,
-                    height,
                     &secp,
                 )?;
 
@@ -2061,11 +2087,9 @@ fn do_command(
 
                 // Sender can change that, restoring original value
                 slate.ttl_cutoff_height = original_slate.ttl_cutoff_height.clone();
-                // Checking is sender didn't do any harm to slate
-                Slate::compare_slates_send(&original_slate, &slate)?;
 
-                w.tx_lock_outputs(&slate, address, 0)?;
-                w.finalize_post_slate(&mut slate, fluff)?;
+                w.tx_lock_outputs(&tx_session, &slate, address, 0)?;
+                w.finalize_post_slate(&tx_session, &mut slate, fluff, do_proof)?;
 
                 let ret_id = w.get_id(slate.id)?;
                 cli_message!(
@@ -2075,6 +2099,12 @@ fn do_command(
                     display_to.unwrap()
                 );
                 println!("txid={:?}", ret_id);
+
+                debug_assert!( tx_session.as_ref().unwrap().borrow().get_context_participant().is_none() );
+                wallet_lock!(w.get_wallet_instance()?, w);
+                tx_session.unwrap().borrow_mut().save_tx_data(&mut **w,None, &slate.id )?;
+
+                return Ok(());
             } else {
                 // it must be a slatepack. May be not encrypted
                 // if slatepack_recipient_dalek_pk is none - not encryptrd. Otherwise - encrypted
@@ -2087,8 +2117,11 @@ fn do_command(
                     address = Some(String::from("file_proof"));
                 }
 
+                let tx_session = Some(RefCell::new(TxSession::new()));
+
                 // it must be just a slatepack without file or destination
                 let slate = w.init_send_tx(
+                    &tx_session,
                     address.clone(),
                     amount,
                     confirmations,
@@ -2120,10 +2153,15 @@ fn do_command(
                 )?; // must be a latepack
 
                 // Still colling, lock_later should handle that...
-                w.tx_lock_outputs(&slate, address, 0)?;
+                w.tx_lock_outputs(&tx_session, &slate, address, 0)?;
 
                 cli_message!("Slatepack: {}", slate_str);
                 cli_message!("TxId: {}", slate.id);
+
+                {
+                    wallet_lock!(w.get_wallet_instance()?, w);
+                    tx_session.unwrap().borrow_mut().save_tx_data(&mut **w,None, &slate.id )?;
+                }
 
                 // Stopping updater, sync should be done by now
                 running.store(false, Ordering::Relaxed);
@@ -2177,7 +2215,10 @@ fn do_command(
                 display_to = Some(to.get_stripped());
             }
 
+            let tx_session = Some(RefCell::new(TxSession::new()));
+
             let mut slate = wallet.lock().initiate_receive_tx(
+                &tx_session,
                 Some(to.to_string()),
                 amount,
                 outputs,
@@ -2200,7 +2241,6 @@ fn do_command(
             let original_slate = slate.clone();
             let (dalek_secret, _dalek_pk) = w.get_slatepack_keys()?;
             let sender = mwc_wallet_impls::create_sender(method, &to.to_string(), &None, None)?;
-            let height = w.get_height()?;
             let secp = Secp256k1::new();
             slate = sender.send_tx(
                 false,
@@ -2209,7 +2249,6 @@ fn do_command(
                 &dalek_secret,
                 slatepack_recipient_dalek_pk,
                 sender.check_other_wallet_version(&to.to_string(), true)?,
-                height,
                 &secp,
             )?;
             // Sender can chenge that, restoring original value
@@ -2220,8 +2259,8 @@ fn do_command(
             {
                 // Do exactly what send does..
                 let w = wallet.lock();
-                w.tx_lock_outputs(&slate, Some(to.to_string()), 0)?;
-                w.finalize_post_slate(&mut slate, fluff)?;
+                w.tx_lock_outputs(&tx_session, &slate, Some(to.to_string()), 0)?;
+                w.finalize_post_slate(&tx_session, &mut slate, fluff, true)?;
             }
 
             // Locking for this slate is skipped. Transaction will be received at return state
@@ -2231,6 +2270,12 @@ fn do_command(
                 core::amount_to_hr_string(slate.amount, false),
                 display_to.unwrap()
             );
+
+            {
+                debug_assert!(tx_session.as_ref().unwrap().borrow().get_context_participant().is_none());
+                wallet_lock!(w.get_wallet_instance()?, w);
+                tx_session.unwrap().borrow_mut().save_tx_data(&mut **w, None, &slate.id)?;
+            }
         }
         Some("restore") => {
             *out_is_safe = false;
